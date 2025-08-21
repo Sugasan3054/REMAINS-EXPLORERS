@@ -499,7 +499,7 @@ public class GameManager : MonoBehaviour
         List<int> availableRoleIds = new List<int>();
         foreach (var role in roleDatabase.Values)
         {
-            if (role.id != 7 && role.id != currentGameData.players[otherPlayerId].Role.id)
+            if (role.id != 7 && role.id != 10)
             {
                 availableRoleIds.Add(role.id);
             }
@@ -599,8 +599,8 @@ public class GameManager : MonoBehaviour
             { 5, new Role(6, "Duelist", "The player who scores more in their turn wins the duel.", 1) },
             { 6, new Role(7, "Student", "Choose a new role from 3 random options during the game.", 1) },
             { 7, new Role(8, "Magician", "Swap the positions of two tiles.", 1) },
-            { 8, new Role(9, "Executioner", "Disable the opponent's ability.", 1) },
-            { 9, new Role(10, "Crown Prince", "Win the game if all non-bomb tiles are cleared.", 1) }
+            { 8, new Role(9, "Executive Officer", "Disable the opponent's ability.", 1) },
+            { 9, new Role(10, "Prince", "Win the game if all non-bomb tiles are cleared.", 1) }
         };
     }
 
