@@ -7,18 +7,19 @@ public class AbilityManager : MonoBehaviour
 {
     [Header("Ability Panels")]
     [SerializeField] private GameObject investigatorPanel;
-    [SerializeField] private GameObject studentPanel; // Studentパネルへの参照を追加
+    [SerializeField] private GameObject studentPanel;
 
     [Header("Main Ability Buttons")]
     [SerializeField] private Button player1AbilityButton;
     [SerializeField] private Button player2AbilityButton;
 
     [Header("Student Panel Buttons")]
-    [SerializeField] private Button[] studentChoiceButtons; // 3つの選択肢ボタンの配列
+    [SerializeField] private Button[] studentChoiceButtons;
 
     void Update()
     {
-        if (GameManager.Instance == null || !GameManager.Instance.isPlaying)
+        // 参照先を currentGameData に変更
+        if (GameManager.Instance == null || !GameManager.Instance.currentGameData.isPlaying)
         {
             if (player1AbilityButton != null) player1AbilityButton.interactable = false;
             if (player2AbilityButton != null) player2AbilityButton.interactable = false;
@@ -33,10 +34,12 @@ public class AbilityManager : MonoBehaviour
     {
         if (abilityButton == null) return;
 
-        PlayerData playerData = GameManager.Instance.players[playerId];
+        // 参照先を currentGameData に変更
+        PlayerData playerData = GameManager.Instance.currentGameData.players[playerId];
         bool canUse = false;
 
-        if (GameManager.Instance.currentPlayerId == playerId)
+        // 参照先を currentGameData に変更
+        if (GameManager.Instance.currentGameData.currentPlayerId == playerId)
         {
             canUse = !playerData.Role.isDisabled &&
                      playerData.Role.usedAbilities < playerData.Role.abilityUses;
@@ -45,8 +48,7 @@ public class AbilityManager : MonoBehaviour
             {
                 canUse = false;
             }
-
-            if (playerData.Role.id == 10)
+            if (playerData.Role.id == 10) // Crown Prince
             {
                 canUse = false;
             }
@@ -57,37 +59,29 @@ public class AbilityManager : MonoBehaviour
             {
                 canUse = false;
             }
-
             if (canUse && playerData.Role.id == 5 && remainingSafeTiles < 12) // Dog Master
             {
                 canUse = false;
             }
-
             if (canUse && playerData.Role.id == 6 && remainingSafeTiles < 10) // Duelist
             {
                 canUse = false;
             }
-
-            // ▼▼▼ 大学生(ID:7)の追加条件 ▼▼▼
             if (canUse && playerData.Role.id == 7 && remainingSafeTiles < 30)
             {
-                canUse = false; // 30タイル未満残っている場合は使用不可
+                canUse = false;
             }
-
             if (canUse && playerData.Role.id == 8 && remainingSafeTiles < 16)
             {
-                canUse = false; // 16タイル未満残っている場合は使用不可
+                canUse = false;
             }
-
             if (canUse && playerData.Role.id == 9)
             {
-                // プレイヤーのスコアが15未満なら使用不可にする
                 if (playerData.Score < 15)
                 {
                     canUse = false;
                 }
             }
-
         }
 
         abilityButton.interactable = canUse;
@@ -95,7 +89,8 @@ public class AbilityManager : MonoBehaviour
 
     public void OnAbilityButtonPressed()
     {
-        int currentRoleId = GameManager.Instance.players[GameManager.Instance.currentPlayerId].Role.id;
+        // 参照先を currentGameData に変更
+        int currentRoleId = GameManager.Instance.currentGameData.players[GameManager.Instance.currentGameData.currentPlayerId].Role.id;
         switch (currentRoleId)
         {
             case 1:
@@ -113,7 +108,7 @@ public class AbilityManager : MonoBehaviour
             case 6:
                 GameManager.Instance.UseAbility(6);
                 break;
-            case 7: // 大学生
+            case 7:
                 GameManager.Instance.UseAbility(7);
                 break;
             case 8:
@@ -139,18 +134,15 @@ public class AbilityManager : MonoBehaviour
     public void OnGuessRoleSelected(int guessedRoleId)
     {
         GameManager.Instance.UseAbility(1, -1, guessedRoleId);
-
         if (investigatorPanel != null)
         {
             investigatorPanel.SetActive(false);
         }
     }
 
-    // --- 大学生の能力パネルを開く ---
     public void OpenStudentPanel(List<Role> roleChoices)
     {
         if (studentPanel == null || studentChoiceButtons.Length < 3) return;
-
         studentPanel.SetActive(true);
 
         for (int i = 0; i < studentChoiceButtons.Length; i++)
@@ -158,12 +150,9 @@ public class AbilityManager : MonoBehaviour
             if (i < roleChoices.Count)
             {
                 studentChoiceButtons[i].gameObject.SetActive(true);
-                // ボタンのテキストを役職名に変更
                 studentChoiceButtons[i].GetComponentInChildren<TMP_Text>().text = roleChoices[i].name;
-
-                // ボタンのクリックイベントを一度クリアしてから、新しいイベントを設定
                 studentChoiceButtons[i].onClick.RemoveAllListeners();
-                int roleId = roleChoices[i].id; // ループ内で使うため、一時変数にIDをコピー
+                int roleId = roleChoices[i].id;
                 studentChoiceButtons[i].onClick.AddListener(() => OnStudentRoleSelected(roleId));
             }
             else
@@ -173,7 +162,6 @@ public class AbilityManager : MonoBehaviour
         }
     }
 
-    // 大学生パネルの役職ボタンから呼び出される
     public void OnStudentRoleSelected(int newRoleId)
     {
         GameManager.Instance.ChangePlayerRole(newRoleId);

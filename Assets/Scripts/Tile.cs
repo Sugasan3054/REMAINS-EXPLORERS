@@ -6,10 +6,9 @@ using TMPro;
 
 public class Tile : MonoBehaviour, IPointerClickHandler
 {
-    // --- フィールド宣言 ---
     public TileType TileType { get; private set; } = TileType.EMPTY;
     public bool IsDigged { get; private set; } = false;
-    public int AdjacentBombCount { get; private set; } // 周囲の爆弾数を記憶するプロパティ
+    public int AdjacentBombCount { get; private set; }
     private GameManager mGameManager;
     private MarkState mMarkState = MarkState.NO_MARK;
     private int mIndex;
@@ -50,7 +49,12 @@ public class Tile : MonoBehaviour, IPointerClickHandler
 
     public void OnPointerClick(PointerEventData eventData)
     {
-        if (mGameManager == null || !mGameManager.isPlaying) return;
+        // ▼▼▼ 参照先を currentGameData に変更 ▼▼▼
+        if (mGameManager == null || mGameManager.currentGameData == null || !mGameManager.currentGameData.isPlaying)
+        {
+            Debug.LogWarning("Tile clicked but isPlaying is FALSE. Click blocked.");
+            return;
+        }
 
         if (eventData.button == PointerEventData.InputButton.Right)
         {
@@ -78,7 +82,7 @@ public class Tile : MonoBehaviour, IPointerClickHandler
 
     public void SetCount(int count)
     {
-        this.AdjacentBombCount = count; // 受け取った数字を記憶
+        this.AdjacentBombCount = count;
         TileType = (count == 0) ? TileType.EMPTY : TileType.COUNT;
 
         if (mCount != null)
@@ -149,10 +153,8 @@ public class Tile : MonoBehaviour, IPointerClickHandler
         }
     }
 
-    // Tile.cs にこのメソッドを追加
     public void UpdateIndex(int newIndex)
     {
         mIndex = newIndex;
     }
-
 }

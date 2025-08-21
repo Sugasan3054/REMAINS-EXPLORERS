@@ -1,18 +1,17 @@
 using UnityEngine;
 using UnityEngine.UI;
-using TMPro;
 using UnityEngine.SceneManagement;
 
 public class RoleSelectionManager : MonoBehaviour
 {
-    public GameManager gameManager;
     public Button[] roleButtons;
     private int selectedRoleId = -1;
+
+    // public GameManager gameManager; // ← Inspectorからの設定は不要なので削除
 
     public void SelectRole(int roleId)
     {
         Debug.Log("Selected Role ID: " + roleId);
-        //上はボタンのクリックが正常にされているか確認用
         foreach (var button in roleButtons)
         {
             button.GetComponent<Image>().color = Color.white;
@@ -29,8 +28,20 @@ public class RoleSelectionManager : MonoBehaviour
     {
         if (selectedRoleId != -1)
         {
-            gameManager.StartGameWithRole(selectedRoleId);
-            SceneManager.LoadScene("Main");
+            // ▼▼▼ ここが最重要の修正点 ▼▼▼
+            // Inspectorから設定するのではなく、シングルトンのInstanceを直接呼び出す
+            if (GameManager.Instance != null)
+            {
+                GameManager.Instance.StartGameWithRole(selectedRoleId);
+            }
+            else
+            {
+                Debug.LogError("GameManagerが見つかりません！Initializerシーンからゲームを開始していますか？");
+            }
+
+            // ▲▲▲ ここまで ▲▲▲
+
+            // SceneManager.LoadScene("Main"); // ← この行は不要なので削除
         }
         else
         {

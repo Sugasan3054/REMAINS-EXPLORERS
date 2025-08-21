@@ -1,4 +1,4 @@
-using System.Collections;
+ï»¿using System.Collections;
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -10,13 +10,12 @@ using UnityEngine.SceneManagement;
 public class GameManager : MonoBehaviour
 {
     public static GameManager Instance { get; private set; }
+    public GameData currentGameData;
 
     [Header("Game Board")]
     [SerializeField] private BoardManager mBoardManager;
-
     [Header("Ability UI")]
     [SerializeField] private AbilityManager mAbilityManager;
-
     [Header("UI References")]
     [SerializeField] private TMP_Text mTurnText;
     [SerializeField] private TMP_Text mPlayer1ScoreText;
@@ -25,20 +24,13 @@ public class GameManager : MonoBehaviour
     [SerializeField] private TMP_Text mGameOverMessage;
     [SerializeField] private TMP_Text mFeedbackText;
 
-    public Dictionary<string, PlayerData> players = new Dictionary<string, PlayerData>();
-    public string currentPlayerId { get; private set; }
-    private string otherPlayerId => currentPlayerId == "player1" ? "player2" : "player1";
-    private int turnCount = 0;
-    public bool isPlaying { get; private set; } = false;
-
+    private string otherPlayerId => currentGameData.currentPlayerId == "player1" ? "player2" : "player1";
     private bool isInPredictionMode = false;
     private bool isInProphecyMode = false;
-    private bool isInSwapMode = false; // –‚pt‚Ìƒ^ƒCƒ‹ŒğŠ·
-    private List<int> tilesToSwap = new List<int>(); // ŒğŠ·‘ÎÛ‚Ìƒ^ƒCƒ‹‚Ì‹L˜^ƒŠƒXƒg
-
+    private bool isInSwapMode = false;
+    private List<int> tilesToSwap = new List<int>();
     private string duelistId = null;
     private int duelistTurnScore = 0;
-
     private Dictionary<int, Role> roleDatabase;
     public BoardManager Board => mBoardManager;
 
@@ -48,9 +40,12 @@ public class GameManager : MonoBehaviour
         {
             Instance = this;
             DontDestroyOnLoad(gameObject);
-            InitializeRoles();
-            InitializePlayers();
             SceneManager.sceneLoaded += OnSceneLoaded;
+
+            InitializeRoles(); // Roleãƒ‡ãƒ¼ã‚¿ãƒ™ãƒ¼ã‚¹ã¯æœ€åˆã«ä¸€åº¦ã ã‘èª­ã¿è¾¼ã‚€
+
+            // Initializerã‚·ãƒ¼ãƒ³ã®å½¹ç›®ã¯ã“ã“ã¾ã§ã€‚ã™ãã«Titleã‚·ãƒ¼ãƒ³ã¸ç§»å‹•ã™ã‚‹ã€‚
+            SceneManager.LoadScene("Title");
         }
         else
         {
@@ -63,11 +58,9 @@ public class GameManager : MonoBehaviour
         SceneManager.sceneLoaded -= OnSceneLoaded;
     }
 
-    private Button mRestartButton;
-
-
     private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
+        // Mainã‚·ãƒ¼ãƒ³ãŒãƒ­ãƒ¼ãƒ‰ã•ã‚ŒãŸæ™‚ã ã‘ã€ä»¥ä¸‹ã®æº–å‚™å‡¦ç†ã‚’è¡Œã†
         if (scene.name == "Main")
         {
             mBoardManager = FindObjectOfType<BoardManager>();
@@ -79,16 +72,14 @@ public class GameManager : MonoBehaviour
             mGameOverMessage = mGameOverPanel?.transform.Find("GameOverMessageText")?.GetComponent<TMP_Text>();
             mFeedbackText = GameObject.Find("FeedbackText")?.GetComponent<TMP_Text>();
 
-            Transform restartButtonTransform = mGameOverPanel?.transform.Find("RestartButton");
-            if (restartButtonTransform != null)
+            if (mGameOverPanel != null)
             {
-                mRestartButton = restartButtonTransform.GetComponent<Button>();
-                if (mRestartButton != null)
+                mGameOverPanel.SetActive(false);
+                Button restartButton = mGameOverPanel.transform.Find("RestartButton")?.GetComponent<Button>();
+                if (restartButton != null)
                 {
-                    // ˆÈ‘O‚ÌƒŠƒXƒi[‚ğ”O‚Ì‚½‚ß‘S‚ÄƒNƒŠƒA
-                    mRestartButton.onClick.RemoveAllListeners();
-                    // ‚±‚ÌƒXƒNƒŠƒvƒgiGameManager_–{•¨j‚ÌReturnToTitleƒƒ\ƒbƒh‚ğ“o˜^
-                    mRestartButton.onClick.AddListener(ReturnToTitle);
+                    restartButton.onClick.RemoveAllListeners();
+                    restartButton.onClick.AddListener(ReturnToTitle);
                 }
             }
 
@@ -96,28 +87,34 @@ public class GameManager : MonoBehaviour
         }
     }
 
+    // Selectã‚·ãƒ¼ãƒ³ã‹ã‚‰å‘¼ã°ã‚Œã‚‹ã€å”¯ä¸€ã®ã‚²ãƒ¼ãƒ é–‹å§‹å‘½ä»¤
     public void StartGameWithRole(int selectedRoleIndex)
     {
-        players["player1"].Role = roleDatabase[selectedRoleIndex];
+        // æ–°ã—ã„ã‚²ãƒ¼ãƒ ãƒ‡ãƒ¼ã‚¿ã‚’ä½œæˆã—ã¦ã€ã‚²ãƒ¼ãƒ ã®çŠ¶æ…‹ã‚’å®Œå…¨ã«ãƒªã‚»ãƒƒãƒˆ
+        currentGameData = new GameData();
+
+        // é¸æŠã•ã‚ŒãŸå½¹è·ã‚’ãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼1ã«è¨­å®š
+        currentGameData.players["player1"].Role = new Role(roleDatabase[selectedRoleIndex]);
+
+        // ãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼2ã«ãƒ©ãƒ³ãƒ€ãƒ ãªå½¹è·ã‚’è¨­å®š
         List<int> availableRoles = new List<int>(roleDatabase.Keys);
-        availableRoles.Remove(selectedRoleIndex);
         int enemyRoleId = availableRoles[UnityEngine.Random.Range(0, availableRoles.Count)];
-        //Debug
-        enemyRoleId = 0;
-        players["player2"].Role = roleDatabase[enemyRoleId];
+        currentGameData.players["player2"].Role = new Role(roleDatabase[enemyRoleId]);
+
+        // Mainã‚·ãƒ¼ãƒ³ã‚’ãƒ­ãƒ¼ãƒ‰
         SceneManager.LoadScene("Main");
     }
 
+    // OnSceneLoadedã‹ã‚‰å‘¼ã°ã‚Œã€Mainã‚·ãƒ¼ãƒ³ã§ã®ã‚²ãƒ¼ãƒ ãƒ—ãƒ¬ã‚¤ã‚’é–‹å§‹ã™ã‚‹
     public void StartGame()
     {
-        isPlaying = true;
-        turnCount = 0;
-        currentPlayerId = "player1";
+        // ã‚²ãƒ¼ãƒ ã®çŠ¶æ…‹ã‚’åˆæœŸåŒ–
+        currentGameData.isPlaying = true;
+        currentGameData.turnCount = 0;
+        currentGameData.currentPlayerId = "player1";
         duelistId = null;
-        if (mGameOverPanel != null) mGameOverPanel.SetActive(false);
-        if (mFeedbackText != null) mFeedbackText.gameObject.SetActive(false);
 
-        foreach (var player in players.Values)
+        foreach (var player in currentGameData.players.Values)
         {
             player.Score = 0;
             player.TurnMoves = 0;
@@ -151,25 +148,39 @@ public class GameManager : MonoBehaviour
         UpdateUI();
     }
 
+    public void ReturnToTitle()
+    {
+        // Titleã‚·ãƒ¼ãƒ³ã«æˆ»ã‚‹ã ã‘ã€‚ãƒªã‚»ãƒƒãƒˆã¯æ¬¡ã®StartGameWithRoleãŒæ‹…å½“ã™ã‚‹
+        SceneManager.LoadScene("Title");
+    }
+
+    // --- ä»¥ä¸‹ã€OnTileClickedã‚„ä»–ã®ã‚²ãƒ¼ãƒ ãƒ­ã‚¸ãƒƒã‚¯ãƒ¡ã‚½ãƒƒãƒ‰ ---
+    // (currentGameDataã‚’å‚ç…§ã™ã‚‹ã‚ˆã†ã«ä¿®æ­£æ¸ˆã¿)
+
     public void OnTileClicked(int index, bool isDirectClick = true)
     {
+        // isPlayingã®ãƒã‚§ãƒƒã‚¯ã¯ã€ç›´æ¥ã‚¯ãƒªãƒƒã‚¯ã®å ´åˆã®ã¿ã‚²ãƒ¼ãƒ é–‹å§‹å¾Œã«è¡Œã†
+        if (isDirectClick && !currentGameData.isPlaying) return;
+
+        string currentPlayerId = currentGameData.currentPlayerId;
+
         if (isInProphecyMode)
         {
             Tile prophecyTile = mBoardManager.GetTile(index);
             if (prophecyTile == null) return;
             string feedback = (prophecyTile.TileType == TileType.BOOM) ? "Bomb" : "Safe";
             isInProphecyMode = false;
-            players[currentPlayerId].Role.usedAbilities++;
-            isPlaying = true;
+            currentGameData.players[currentPlayerId].Role.usedAbilities++;
+            currentGameData.isPlaying = true;
             ShowFeedbackText(feedback + "!", () => { UpdateUI(); });
             return;
         }
 
         if (isInPredictionMode)
         {
-            players[currentPlayerId].SpecialStates["gambler_prediction"] = index;
+            currentGameData.players[currentPlayerId].SpecialStates["gambler_prediction"] = index;
             isInPredictionMode = false;
-            players[currentPlayerId].Role.usedAbilities++;
+            currentGameData.players[currentPlayerId].Role.usedAbilities++;
             ShowFeedbackText($"Predicted tile {index}. Now open a tile.");
             return;
         }
@@ -180,23 +191,21 @@ public class GameManager : MonoBehaviour
             return;
         }
 
-
-        if (!isPlaying) return;
         if (isDirectClick)
         {
             CheckGamblerPrediction(index);
-            if (!isPlaying) return;
+            if (!currentGameData.isPlaying) return;
         }
 
         Tile tile = mBoardManager.GetTile(index);
         if (tile == null || tile.IsDigged) return;
 
         if (tile.TileType == TileType.BOOM &&
-            players.ContainsKey(currentPlayerId) &&
-            players[currentPlayerId].Role.id == 4 &&
-            players[currentPlayerId].IsAlive == true)
+            currentGameData.players.ContainsKey(currentPlayerId) &&
+            currentGameData.players[currentPlayerId].Role.id == 4 &&
+            currentGameData.players[currentPlayerId].IsAlive == true)
         {
-            players[currentPlayerId].IsAlive = false;
+            currentGameData.players[currentPlayerId].IsAlive = false;
             ShowFeedbackText("God's protection saved you!");
             return;
         }
@@ -217,13 +226,13 @@ public class GameManager : MonoBehaviour
             {
                 if (tile.TileType == TileType.COUNT)
                 {
-                    players[currentPlayerId].Score += tile.AdjacentBombCount;
-                    players[currentPlayerId].TurnScore += tile.AdjacentBombCount;
+                    currentGameData.players[currentPlayerId].Score += tile.AdjacentBombCount;
+                    currentGameData.players[currentPlayerId].TurnScore += tile.AdjacentBombCount;
                 }
-                players[currentPlayerId].TurnMoves++;
+                currentGameData.players[currentPlayerId].TurnMoves++;
             }
             CheckForGameClear();
-            if (isPlaying && isDirectClick)
+            if (currentGameData.isPlaying && isDirectClick)
             {
                 EndTurn();
             }
@@ -235,45 +244,34 @@ public class GameManager : MonoBehaviour
         GameOver(otherPlayerId);
     }
 
-    // ¥¥¥ Œˆ“¬ƒƒWƒbƒN‚ğŠ®‘S‚É‘‚«Š·‚¦‚½ÅI”Å ¥¥¥
     public void EndTurn()
     {
-        // Œˆ“¬‚ªis’†‚©ƒ`ƒFƒbƒN
+        string currentPlayerId = currentGameData.currentPlayerId;
         if (duelistId != null)
         {
-            // ¡ƒ^[ƒ“‚ğI‚¦‚é‚Ì‚ªuŒˆ“¬Òv–{l‚©H
             if (currentPlayerId == duelistId)
             {
-                // ƒXƒRƒA‚ğ‹L˜^‚µA’Êí‚Ìƒ^[ƒ“Œğ‘ã‚Ö
-                duelistTurnScore = players[currentPlayerId].TurnScore;
+                duelistTurnScore = currentGameData.players[currentPlayerId].TurnScore;
                 ProceedToNextTurn();
             }
-            else // ¡ƒ^[ƒ“‚ğI‚¦‚é‚Ì‚ªu‘Šèv‚Ìê‡
+            else
             {
-                // ‚±‚±‚ÅŒˆ“¬‚ÌŒ‹‰Ê”»’è‚ğs‚¤
-                PlayerData duelist = players[duelistId];
-                PlayerData opponent = players[currentPlayerId];
+                PlayerData duelist = currentGameData.players[duelistId];
+                PlayerData opponent = currentGameData.players[currentPlayerId];
                 int opponentTurnScore = opponent.TurnScore;
 
-                // Œˆ“¬ó‘Ô‚ğæ‚ÉƒŠƒZƒbƒg
                 duelistId = null;
+                currentGameData.isPlaying = false;
 
-                isPlaying = false; // ”»’è’†‚Í‘€ì•s”\‚É
                 ShowFeedbackText($"Duel! {duelist.PlayerId.ToUpper()}({duelistTurnScore}) vs {opponent.PlayerId.ToUpper()}({opponentTurnScore})", () =>
                 {
-                    if (duelistTurnScore > opponentTurnScore)
-                    {
-                        GameOver(duelist.PlayerId.ToUpper());
-                    }
-                    else if (opponentTurnScore > duelistTurnScore)
-                    {
-                        GameOver(opponent.PlayerId.ToUpper());
-                    }
-                    else // ˆø‚«•ª‚¯
+                    if (duelistTurnScore > opponentTurnScore) { GameOver(duelist.PlayerId.ToUpper()); }
+                    else if (opponentTurnScore > duelistTurnScore) { GameOver(opponent.PlayerId.ToUpper()); }
+                    else
                     {
                         ShowFeedbackText("Duel is a Draw!", () => {
-                            isPlaying = true;
-                            ProceedToNextTurn(); // ƒ^[ƒ“is‚ğÄŠJ
+                            currentGameData.isPlaying = true;
+                            ProceedToNextTurn();
                         });
                     }
                 });
@@ -281,16 +279,15 @@ public class GameManager : MonoBehaviour
         }
         else
         {
-            // Œˆ“¬’†‚Å‚È‚¯‚ê‚ÎA’Êí‚Ìƒ^[ƒ“I—¹ˆ—
             ProceedToNextTurn();
         }
     }
 
     private void ProceedToNextTurn()
     {
-        turnCount++;
-        currentPlayerId = (turnCount % 2 == 0) ? "player1" : "player2";
-        foreach (var player in players.Values)
+        currentGameData.turnCount++;
+        currentGameData.currentPlayerId = (currentGameData.turnCount % 2 == 0) ? "player1" : "player2";
+        foreach (var player in currentGameData.players.Values)
         {
             player.TurnMoves = 0;
             player.TurnScore = 0;
@@ -300,40 +297,28 @@ public class GameManager : MonoBehaviour
 
     public void GameOver(string winnerId)
     {
-        isPlaying = false;
+        currentGameData.isPlaying = false;
         if (mGameOverPanel != null) mGameOverPanel.SetActive(true);
         if (mGameOverMessage != null) mGameOverMessage.text = $"{winnerId} WIN!";
     }
 
-    public void ReturnToTitle()
-    {
-        // "Title"‚Æ‚¢‚¤–¼‘O‚ÌƒV[ƒ“‚ğƒ[ƒh‚·‚é
-        Debug.Log("ReturnToTitleƒƒ\ƒbƒh‚ªŒÄ‚Î‚ê‚Ü‚µ‚½I‚±‚ê‚©‚çTitleƒV[ƒ“‚ÉˆÚ“®‚µ‚Ü‚·B");
-        SceneManager.LoadScene("Title");
-    }
-
-
     private void UpdateUI()
     {
-        if (mTurnText != null) mTurnText.text = $"TURN: {currentPlayerId.ToUpper()}";
-        if (mPlayer1ScoreText != null) mPlayer1ScoreText.text = $"PLAYER1\nScore: {players["player1"].Score}";
-        if (mPlayer2ScoreText != null) mPlayer2ScoreText.text = $"PLAYER2\nScore: {players["player2"].Score}";
+        if (currentGameData == null || !currentGameData.players.ContainsKey("player1")) return;
+
+        if (mTurnText != null) mTurnText.text = $"TURN: {currentGameData.currentPlayerId.ToUpper()}";
+        if (mPlayer1ScoreText != null) mPlayer1ScoreText.text = $"PLAYER1\nScore: {currentGameData.players["player1"].Score}";
+        if (mPlayer2ScoreText != null) mPlayer2ScoreText.text = $"PLAYER2\nScore: {currentGameData.players["player2"].Score}";
     }
 
     private void DetermineWinnerByScore()
     {
-        isPlaying = false;
-        int score1 = players["player1"].Score;
-        int score2 = players["player2"].Score;
+        currentGameData.isPlaying = false;
+        int score1 = currentGameData.players["player1"].Score;
+        int score2 = currentGameData.players["player2"].Score;
 
-        if (score1 > score2)
-        {
-            GameOver("PLAYER1");
-        }
-        else if (score2 > score1)
-        {
-            GameOver("PLAYER2");
-        }
+        if (score1 > score2) { GameOver("PLAYER1"); }
+        else if (score2 > score1) { GameOver("PLAYER2"); }
         else
         {
             if (mGameOverPanel != null) mGameOverPanel.SetActive(true);
@@ -346,30 +331,24 @@ public class GameManager : MonoBehaviour
         if (mBoardManager == null) return;
         if (mBoardManager.GetDiggedTileCount() == mBoardManager.GetTotalSafeTileCount())
         {
-            PlayerData player1 = players["player1"];
-            PlayerData player2 = players["player2"];
-
+            PlayerData player1 = currentGameData.players["player1"];
+            PlayerData player2 = currentGameData.players["player2"];
             bool player1IsPrince = player1.Role.id == 10;
             bool player2IsPrince = player2.Role.id == 10;
 
-            // 1. ƒvƒŒƒCƒ„[‚Ì‚¤‚¿•Ğ•û‚¾‚¯‚ªc‘¾q‚Ìê‡
-            if (player1IsPrince != player2IsPrince) // (p1‚ªc‘¾q && p2‚ªˆá‚¤) OR (p1‚ªˆá‚¤ && p2‚ªc‘¾q)
+            if (player1IsPrince != player2IsPrince)
             {
-                // c‘¾q‚Å‚ ‚éƒvƒŒƒCƒ„[‚ÌŸ—˜
                 string winnerId = player1IsPrince ? player1.PlayerId : player2.PlayerId;
                 GameOver(winnerId.ToUpper());
             }
-            // 2. —¼ƒvƒŒƒCƒ„[‚ªc‘¾q‚Ìê‡A‚Ü‚½‚Í—¼•û‚Æ‚àc‘¾q‚Å‚È‚¢ê‡
             else
             {
-                // ’Êí’Ê‚èƒXƒRƒA‚ÅŸ”s‚ğŒˆ’è‚·‚é
                 DetermineWinnerByScore();
             }
         }
     }
 
     #region Role Abilities
-
     public void ShowFeedbackText(string message, Action onComplete = null, float duration = 1.5f)
     {
         StartCoroutine(FeedbackCoroutine(message, duration, onComplete));
@@ -389,7 +368,9 @@ public class GameManager : MonoBehaviour
 
     public void UseAbility(int abilityId, int targetPlayerId = -1, int data1 = -1, int data2 = -1)
     {
-        PlayerData player = players[currentPlayerId];
+        string currentPlayerId = currentGameData.currentPlayerId;
+        PlayerData player = currentGameData.players[currentPlayerId];
+
         if (player.Role.isDisabled || player.Role.usedAbilities >= player.Role.abilityUses)
         {
             ShowFeedbackText("Cannot use ability");
@@ -397,92 +378,42 @@ public class GameManager : MonoBehaviour
         }
 
         int remainingSafeTiles = mBoardManager.GetTotalSafeTileCount() - mBoardManager.GetDiggedTileCount();
+        if (abilityId == 2 && remainingSafeTiles <= 10) { ShowFeedbackText("Cannot predict with 10 or fewer tiles remaining"); return; }
+        if (abilityId == 5 && remainingSafeTiles < 12) { ShowFeedbackText("Cannot use with fewer than 12 tiles remaining"); return; }
+        if (abilityId == 6 && remainingSafeTiles < 10) { ShowFeedbackText("Cannot duel with fewer than 10 tiles remaining"); return; }
+        if (abilityId == 7 && remainingSafeTiles < 30) { ShowFeedbackText("Cannot change job with with fewer than 30 tiles remaining"); return; }
+        if (abilityId == 8 && remainingSafeTiles < 16) { ShowFeedbackText("Cannot magic with fewer than 16 tiles remaining"); return; }
+        if (abilityId == 9 && player.Score < 15) { ShowFeedbackText("Score must be 15 ore higher"); return; }
 
-        if (abilityId == 2 && remainingSafeTiles <= 10)
-        {
-            ShowFeedbackText("Cannot predict with 10 or fewer tiles remaining");
-            return;
-        }
-
-        if (abilityId == 5 && remainingSafeTiles < 12)
-        {
-            ShowFeedbackText("Cannot use with fewer than 12 tiles remaining");
-            return;
-        }
-
-        if (abilityId == 6 && remainingSafeTiles < 10)
-        {
-            ShowFeedbackText("Cannot duel with fewer than 10 tiles remaining");
-            return;
-        }
-
-        if (abilityId == 7 && remainingSafeTiles < 30)
-        {
-            ShowFeedbackText("Cannot change job with with fewer than 30 tiles remaining");
-            return;
-        }
-
-        if (abilityId == 8 && remainingSafeTiles <16)
-        {
-            ShowFeedbackText("Cannot magic with fewer than 16 tiles remaining");
-            return;
-        }
-
-        if (abilityId == 9 && player.Score < 15)
-        {
-            ShowFeedbackText("Score must be 15 ore higher");
-            return;
-        }
-
-        //”\—Íg—p‚ğæ‚ÉƒJƒEƒ“ƒg‚·‚éB
         player.Role.usedAbilities++;
-
-
 
         switch (abilityId)
         {
-            case 1:
-                InvestigatorAbility(players[otherPlayerId], data1);
-                break;
-            case 2:
-                StartGamblerPrediction();
-                break;
-            case 3:
-                StartProphecy();
-                break;
-            case 5:
-                DogMasterAbility();
-                break;
-            case 6:
-                StartDuel();
-                break;
-            case 7:
-                StudentAbility();
-                break;
-            case 8:
-                StartSwapMode();
-                break;
-            case 9:
-                ExecutionerAbility(players[otherPlayerId]);
-                break;
+            case 1: InvestigatorAbility(currentGameData.players[otherPlayerId], data1); break;
+            case 2: StartGamblerPrediction(); break;
+            case 3: StartProphecy(); break;
+            case 5: DogMasterAbility(); break;
+            case 6: StartDuel(); break;
+            case 7: StudentAbility(); break;
+            case 8: StartSwapMode(); break;
+            case 9: ExecutionerAbility(currentGameData.players[otherPlayerId]); break;
         }
         UpdateUI();
     }
 
     private void InvestigatorAbility(PlayerData targetPlayer, int guessedRoleId)
     {
-        isPlaying = false;
+        string currentPlayerId = currentGameData.currentPlayerId;
+        currentGameData.isPlaying = false;
         if (targetPlayer.Role.id == guessedRoleId && targetPlayer.Role.id != 4)
         {
-            ShowFeedbackText("Correct!", () => {
-                GameOver(currentPlayerId.ToUpper());
-            });
+            ShowFeedbackText("Correct!", () => { GameOver(currentPlayerId.ToUpper()); });
         }
         else
         {
             ShowFeedbackText("Miss", () => {
-                players[currentPlayerId].Role.usedAbilities++;
-                isPlaying = true;
+                currentGameData.players[currentPlayerId].Role.usedAbilities++;
+                currentGameData.isPlaying = true;
                 UpdateUI();
             });
         }
@@ -496,19 +427,20 @@ public class GameManager : MonoBehaviour
 
     private void StartProphecy()
     {
-        isPlaying = false;
+        currentGameData.isPlaying = false;
         isInProphecyMode = true;
         ShowFeedbackText("Select a tile to check...");
     }
 
     private void DogMasterAbility()
     {
+        string currentPlayerId = currentGameData.currentPlayerId;
         if (mBoardManager == null) return;
         List<int> safeTileIndices = mBoardManager.GetRandomSafeTiles(3);
         if (safeTileIndices.Count == 0)
         {
             ShowFeedbackText("No safe tiles found.");
-            players[currentPlayerId].Role.usedAbilities++;
+            currentGameData.players[currentPlayerId].Role.usedAbilities++;
             EndTurn();
             return;
         }
@@ -520,7 +452,7 @@ public class GameManager : MonoBehaviour
             Tile tile = mBoardManager.GetTile(index);
             if (tile != null && !tile.IsDigged)
             {
-                OnTileClicked(index, false); // isDirectClick‚ğfalse‚É
+                OnTileClicked(index, false);
                 feedback += index + " ";
                 if (tile.TileType == TileType.COUNT)
                 {
@@ -529,12 +461,12 @@ public class GameManager : MonoBehaviour
             }
         }
 
-        players[currentPlayerId].Score += scoreFromAbility; // ƒXƒRƒA‚ğ‚±‚±‚Å‰ÁZ
-        players[currentPlayerId].Role.usedAbilities++;
+        currentGameData.players[currentPlayerId].Score += scoreFromAbility;
+        currentGameData.players[currentPlayerId].Role.usedAbilities++;
 
         ShowFeedbackText(feedback, () => {
             CheckForGameClear();
-            if (isPlaying)
+            if (currentGameData.isPlaying)
             {
                 EndTurn();
             }
@@ -543,15 +475,14 @@ public class GameManager : MonoBehaviour
 
     private void StartDuel()
     {
-        duelistId = currentPlayerId;
-        players[currentPlayerId].Role.usedAbilities++;
+        duelistId = currentGameData.currentPlayerId;
+        currentGameData.players[duelistId].Role.usedAbilities++;
         ShowFeedbackText("Duel Started!");
     }
 
     private void StudentAbility()
     {
         if (mAbilityManager == null) return;
-
         List<Role> choices = GetStudentRoleChoices();
         if (choices.Count > 0)
         {
@@ -568,7 +499,7 @@ public class GameManager : MonoBehaviour
         List<int> availableRoleIds = new List<int>();
         foreach (var role in roleDatabase.Values)
         {
-            if (role.id != 7 && role.id != players[otherPlayerId].Role.id)
+            if (role.id != 7 && role.id != currentGameData.players[otherPlayerId].Role.id)
             {
                 availableRoleIds.Add(role.id);
             }
@@ -593,9 +524,9 @@ public class GameManager : MonoBehaviour
 
     public void ChangePlayerRole(int newRoleId)
     {
-        Role newRole = roleDatabase[newRoleId - 1];
-        players[currentPlayerId].Role = newRole;
-        players[currentPlayerId].Role.usedAbilities = 0;
+        string currentPlayerId = currentGameData.currentPlayerId;
+        Role newRole = new Role(roleDatabase[newRoleId - 1]);
+        currentGameData.players[currentPlayerId].Role = newRole;
 
         ShowFeedbackText($"You are now a {newRole.name}!");
         UpdateUI();
@@ -603,7 +534,7 @@ public class GameManager : MonoBehaviour
 
     private void StartSwapMode()
     {
-        isPlaying = false;
+        currentGameData.isPlaying = false;
         isInSwapMode = true;
         tilesToSwap.Clear();
         ShowFeedbackText("Select the first tile to swap.");
@@ -611,9 +542,10 @@ public class GameManager : MonoBehaviour
 
     private void HandleSwapSelection(int index)
     {
+        string currentPlayerId = currentGameData.currentPlayerId;
         Tile tile = mBoardManager.GetTile(index);
 
-        if(tile == null || tile.IsDigged || tilesToSwap.Contains(index))
+        if (tile == null || tile.IsDigged || tilesToSwap.Contains(index))
         {
             ShowFeedbackText("You cannot select this tile.");
             return;
@@ -621,20 +553,13 @@ public class GameManager : MonoBehaviour
 
         tilesToSwap.Add(index);
 
-        if(tilesToSwap.Count == 1)
-        {
-            //1‚Â–Ú‚Ìƒ^ƒCƒ‹‚ğ‘I‘ğ
-            ShowFeedbackText("Select the second tile to swap.");
-        }
+        if (tilesToSwap.Count == 1) { ShowFeedbackText("Select the second tile to swap."); }
         else if (tilesToSwap.Count == 2)
         {
-            //2‚Â–Ú‚Ìƒ^ƒCƒ‹‚ğ‘I‘ğ‚µ‚½‚Ì‚ÅAŒğŠ·‚ğÀs
             mBoardManager.SwapTiles(tilesToSwap[0], tilesToSwap[1]);
-
             isInSwapMode = false;
-            players[currentPlayerId].Role.usedAbilities++;
-            isPlaying = true; // ‘€ì‰Â”\‚É–ß‚·
-
+            currentGameData.players[currentPlayerId].Role.usedAbilities++;
+            currentGameData.isPlaying = true;
             ShowFeedbackText($"Tiles {tilesToSwap[0]} and {tilesToSwap[1]} have been swapped.", () =>
             {
                 UpdateUI();
@@ -645,26 +570,23 @@ public class GameManager : MonoBehaviour
 
     private void ExecutionerAbility(PlayerData targetPlayer)
     {
-        //“Á•Ê‚ÈŸ—˜ğŒ
-        if(targetPlayer.Role.id == 10)
+        string currentPlayerId = currentGameData.currentPlayerId;
+        if (targetPlayer.Role.id == 10)
         {
-            isPlaying = false;
-            ShowFeedbackText("Kill the Prince", () =>
-            {
+            currentGameData.isPlaying = false;
+            ShowFeedbackText("Kill the Prince", () => {
                 GameOver(currentPlayerId.ToUpper());
             });
         }
-        else // ’ÊíŒø‰Ê
+        else
         {
             targetPlayer.Role.isDisabled = true;
             ShowFeedbackText($"{targetPlayer.PlayerId.ToUpper()}'s ability has been disabled");
         }
     }
-
     #endregion
 
     #region Other Logic
-
     private void InitializeRoles()
     {
         roleDatabase = new Dictionary<int, Role>
@@ -682,16 +604,9 @@ public class GameManager : MonoBehaviour
         };
     }
 
-    private void InitializePlayers()
-    {
-        players.Clear();
-        players.Add("player1", new PlayerData("player1", new Role(-1, "Not Selected", "")));
-        players.Add("player2", new PlayerData("player2", new Role(-1, "Not Selected", "")));
-    }
-
     private void CheckGamblerPrediction(int clickedTileIndex)
     {
-        PlayerData opponent = players[otherPlayerId];
+        PlayerData opponent = currentGameData.players[otherPlayerId];
         if (opponent.SpecialStates.ContainsKey("gambler_prediction"))
         {
             int predictedIndex = (int)opponent.SpecialStates["gambler_prediction"];
